@@ -7,50 +7,74 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
-import { loginUser } from "@/lib/api"; // Step 1: Import the API function
+import { loginUser } from "@/lib/api";
+
+// A simple component for the Google icon
+const GoogleIcon = () => (
+  <svg className="w-5 h-5 mr-2" viewBox="0 0 48 48">
+    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039L38.802 9.92C34.553 6.08 29.658 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"></path>
+    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039L38.802 9.92C34.553 6.08 29.658 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"></path>
+    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.225 0-9.652-3.512-11.303-8H6.306C9.656 35.663 16.318 40 24 40z"></path>
+    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303A12.04 12.04 0 0 1 31.697 34.81l6.19-5.238C41.333 26.6 44 23.4 44 20c0-1.341-.138-2.65-.389-3.917z"></path>
+  </svg>
+);
 
 const Login = () => {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // For loading state
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
-  // Step 2: Update the handleSubmit function to be async and call the backend
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true); // Set loading state
+    setIsLoading(true);
 
-    // --- Frontend validation ---
     if (!formData.email || !formData.password) {
       toast.error("Please fill in all fields");
       setIsLoading(false);
       return;
     }
 
-    // --- Backend API call ---
     try {
-      // Call the loginUser function from our api.ts file
       const data = await loginUser(formData.email, formData.password);
-
-      // Store the token and show success message
       localStorage.setItem("token", data.access_token);
       toast.success("Welcome back!");
-      
-      // Redirect the user to the dashboard
       navigate("/dashboard");
-
     } catch (error: unknown) {
-      // If the API call fails, show the error message from the backend
       toast.error(
         typeof error === "object" && error !== null && "message" in error
           ? (error as { message: string }).message
           : "An error occurred during login"
       );
     } finally {
-      setIsLoading(false); // Reset loading state
+      setIsLoading(false);
+    }
+  };
+
+  // --- NEW: Handler for Google Login ---
+  const handleGoogleLogin = async () => {
+    setIsGoogleLoading(true);
+    try {
+      // 1. Get the authorization URL from our backend
+      const response = await fetch('http://127.0.0.1:8000/auth/google/login');
+      if (!response.ok) {
+        throw new Error("Could not get Google login URL from server.");
+      }
+      const data = await response.json();
+      
+      // 2. Redirect the user to Google's sign-in page
+      window.location.href = data.authorization_url;
+
+    } catch (error: unknown) {
+        const errorMessage = typeof error === "object" && error !== null && "message" in error
+            ? (error as { message: string }).message
+            : "An error occurred during Google login";
+        toast.error(errorMessage);
+        setIsGoogleLoading(false);
     }
   };
 
@@ -70,7 +94,32 @@ const Login = () => {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {/* --- NEW: Google Login Button --- */}
+          <div className="space-y-4">
+            <Button
+              variant="outline"
+              type="button"
+              className="w-full h-12 text-base"
+              onClick={handleGoogleLogin}
+              disabled={isGoogleLoading || isLoading}
+            >
+              <GoogleIcon />
+              {isGoogleLoading ? "Redirecting..." : "Sign in with Google"}
+            </Button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6 mt-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -82,7 +131,7 @@ const Login = () => {
                   setFormData({ ...formData, email: e.target.value })
                 }
                 className="h-12"
-                disabled={isLoading}
+                disabled={isLoading || isGoogleLoading}
               />
             </div>
 
@@ -106,7 +155,7 @@ const Login = () => {
                     setFormData({ ...formData, password: e.target.value })
                   }
                   className="h-12 pr-12"
-                  disabled={isLoading}
+                  disabled={isLoading || isGoogleLoading}
                 />
                 <button
                   type="button"
@@ -125,7 +174,7 @@ const Login = () => {
             <Button
               type="submit"
               className="w-full h-12 text-lg gradient-accent shadow-glow"
-              disabled={isLoading} // Step 3: Disable button while loading
+              disabled={isLoading || isGoogleLoading}
             >
               {isLoading ? "Logging In..." : "Log In"}
             </Button>
