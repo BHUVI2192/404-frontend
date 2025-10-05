@@ -1,196 +1,142 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import {
-  Plus,
-  FolderOpen,
-  MoreVertical,
-  Edit2,
-  Trash2,
-  Settings,
-  Code,
-  LogOut,
-  Brain,
-} from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Clock, TrendingUp, CloudSun, Sun, Search, Mic, Paperclip, ArrowUp, User, Bot } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 
-interface Project {
-  id: string;
-  name: string;
-  lastModified: string;
+// Define the structure of a message
+interface Message {
+  sender: 'user' | 'ai';
+  text: string;
+  model_used?: string;
 }
 
+// Widget data
+const widgets = [
+  { icon: Clock, title: "Shimoga", value: "1:51 AM" }, // Updated time
+  { icon: Sun, title: "Incognito Mode", description: "Your activity won’t be saved." },
+  { icon: TrendingUp, title: "NVDA", value: "$187.62", change: "-0.97%", changeColor: "text-red-500" },
+  { icon: CloudSun, title: "Shimoga, India", value: "21°C", description: "Partly cloudy" },
+];
+
 const Dashboard = () => {
-  const [projects, setProjects] = useState<Project[]>([
-    { id: "1", name: "My First AI Project", lastModified: "2 hours ago" },
-    { id: "2", name: "Web Scraper Bot", lastModified: "1 day ago" },
-    { id: "3", name: "Image Generator", lastModified: "3 days ago" },
-  ]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [prompt, setPrompt] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleCreateProject = () => {
-    const newProject: Project = {
-      id: Date.now().toString(),
-      name: `New Project ${projects.length + 1}`,
-      lastModified: "Just now",
-    };
-    setProjects([newProject, ...projects]);
-    toast.success("Project created!");
+  // Auto-scroll to the latest message
+  useEffect(() => {
+    chatContainerRef.current?.scrollTo({ top: chatContainerRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!prompt.trim() || isLoading) return;
+
+    const userMessage: Message = { sender: 'user', text: prompt };
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    setPrompt("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch('http://127.0.0.1:8000/api/v1/chat/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ prompt: userMessage.text })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Something went wrong");
+      }
+
+      const data = await response.json();
+      const aiMessage: Message = { sender: 'ai', text: data.response, model_used: data.model_used };
+      setMessages(prev => [...prev, aiMessage]);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      toast.error(errorMessage);
+      setMessages(prev => prev.slice(0, prev.length - 1));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDeleteProject = (id: string) => {
-    setProjects(projects.filter((p) => p.id !== id));
-    toast.success("Project deleted");
-  };
-
-  const handleRenameProject = (id: string) => {
-    toast.info("Rename feature coming soon!");
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Sidebar */}
-      <aside className="w-64 border-r bg-card/50 backdrop-blur-sm">
-        <div className="p-6">
-          <Link to="/" className="flex items-center gap-2 group mb-8">
-            <div className="w-10 h-10 rounded-lg bg-gradient-accent flex items-center justify-center shadow-glow group-hover:scale-110 transition-transform">
-              <Brain className="w-6 h-6 text-primary-foreground" />
+    <div className="h-screen w-full flex bg-zinc-900 text-zinc-300 font-sans">
+      <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+
+      <main className="flex-1 flex flex-col items-center p-6">
+        <div className="w-full max-w-4xl mx-auto flex flex-col h-full">
+          
+          {/* Top Input Area */}
+          <div className="relative mb-6">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+            <Input
+              placeholder="Ask anything..."
+              className="w-full h-14 bg-zinc-800 border-zinc-700 rounded-2xl pl-12 pr-28 text-base focus-visible:ring-1 focus-visible:ring-blue-500"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+            />
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              <Button variant="ghost" size="icon" className="hover:bg-zinc-700 text-zinc-400" disabled={isLoading}><Paperclip className="w-5 h-5" /></Button>
+              <Button onClick={handleSendMessage} disabled={!prompt.trim() || isLoading} className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-9 w-9 p-0"><ArrowUp className="w-5 h-5" /></Button>
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              404
-            </span>
-          </Link>
+          </div>
 
-          <nav className="space-y-2">
-            <Button
-              variant="ghost"
-              className="w-full justify-start bg-muted"
-            >
-              <FolderOpen className="w-5 h-5 mr-3" />
-              Projects
-            </Button>
-            <Link to="/studio" className="block">
-              <Button variant="ghost" className="w-full justify-start">
-                <Code className="w-5 h-5 mr-3" />
-                Studio
-              </Button>
-            </Link>
-            <Link to="/settings" className="block">
-              <Button variant="ghost" className="w-full justify-start">
-                <Settings className="w-5 h-5 mr-3" />
-                Settings
-              </Button>
-            </Link>
-          </nav>
-        </div>
-
-        <div className="absolute bottom-6 left-6 right-6">
-          <Link to="/">
-            <Button variant="ghost" className="w-full justify-start text-muted-foreground">
-              <LogOut className="w-5 h-5 mr-3" />
-              Log Out
-            </Button>
-          </Link>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h1 className="text-4xl font-bold mb-2">
-                  Welcome back! 👋
-                </h1>
-                <p className="text-muted-foreground text-lg">
-                  Continue where you left off or start something new
-                </p>
-              </div>
-              <Button
-                size="lg"
-                onClick={handleCreateProject}
-                className="gradient-accent shadow-glow"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Create New Project
-              </Button>
-            </div>
-
-            {projects.length === 0 ? (
-              <Card className="p-16 text-center gradient-card border-0 shadow-lg">
-                <FolderOpen className="w-20 h-20 mx-auto mb-6 text-muted-foreground opacity-50" />
-                <h2 className="text-2xl font-semibold mb-4">No projects yet</h2>
-                <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                  Create your first project to start building with AI
-                </p>
-                <Button
-                  size="lg"
-                  onClick={handleCreateProject}
-                  className="gradient-accent shadow-glow"
-                >
-                  <Plus className="w-5 h-5 mr-2" />
-                  Create Your First Project
-                </Button>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {projects.map((project) => (
-                  <Card
-                    key={project.id}
-                    className="p-6 gradient-card border-0 shadow-lg hover:shadow-xl transition-all hover:-translate-y-1 group cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-glow">
-                        <FolderOpen className="w-6 h-6 text-white" />
+          {/* Dynamic Content: Widgets or Chat */}
+          <div className="flex-1 overflow-y-auto" ref={chatContainerRef}>
+            {messages.length === 0 && !isLoading ? (
+              // Show widgets when there are no messages
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {widgets.map((widget, index) => (
+                  <Card key={index} className="bg-zinc-800 border-zinc-700 rounded-2xl p-4 flex flex-col justify-between">
+                    <CardContent className="p-0">
+                      <div className="flex justify-between items-start mb-4"><widget.icon className="w-5 h-5 text-zinc-400" />{widget.change && <span className={`text-sm font-semibold ${widget.changeColor}`}>{widget.change}</span>}</div>
+                      <div>
+                        <p className="text-sm text-zinc-400">{widget.title}</p>
+                        {widget.value && <p className="text-2xl font-semibold text-zinc-100">{widget.value}</p>}
+                        {widget.description && <p className="text-xs text-zinc-500 mt-1">{widget.description}</p>}
                       </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <MoreVertical className="w-5 h-5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-popover">
-                          <DropdownMenuItem onClick={() => toast.info("Opening project...")}>
-                            <FolderOpen className="w-4 h-4 mr-2" />
-                            Open
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleRenameProject(project.id)}
-                          >
-                            <Edit2 className="w-4 h-4 mr-2" />
-                            Rename
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteProject(project.id)}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <Link to="/studio">
-                      <h3 className="text-xl font-semibold mb-2 group-hover:text-accent transition-colors">
-                        {project.name}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Last modified {project.lastModified}
-                      </p>
-                    </Link>
+                    </CardContent>
                   </Card>
                 ))}
+              </div>
+            ) : (
+              // Show chat history once a conversation starts
+              <div className="space-y-6 pr-4">
+                {messages.map((message, index) => (
+                  <div key={index} className={`flex items-start gap-4 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {message.sender === 'ai' && <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0"><Bot size={20} /></div>}
+                    <div className={`max-w-xl p-4 rounded-2xl ${message.sender === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-zinc-800 text-zinc-300 rounded-bl-none'}`}>
+                      <p className="whitespace-pre-wrap">{message.text}</p>
+                      {message.sender === 'ai' && message.model_used && <p className="text-xs text-zinc-500 mt-2 opacity-70">Answered by: {message.model_used}</p>}
+                    </div>
+                    {message.sender === 'user' && <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center flex-shrink-0"><User size={20} /></div>}
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex items-start gap-4 justify-start">
+                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 animate-pulse"><Bot size={20} /></div>
+                    <div className="max-w-xl p-4 rounded-2xl bg-zinc-800 text-zinc-300 rounded-bl-none">
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce"></div><div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce delay-75"></div><div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce delay-150"></div></div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -201,3 +147,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

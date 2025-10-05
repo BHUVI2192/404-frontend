@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import Navbar from "@/components/Navbar";
 import { registerUser } from "@/lib/api";
 
-// A simple component for the Google icon
 const GoogleIcon = () => (
   <svg className="w-5 h-5 mr-2" viewBox="0 0 48 48">
     <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039L38.802 9.92C34.553 6.08 29.658 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"></path>
@@ -82,7 +81,6 @@ const SignUp = () => {
     }
   };
 
-  // --- NEW: Handler for Google Login ---
   const handleGoogleLogin = async () => {
     setIsGoogleLoading(true);
     try {
@@ -105,9 +103,11 @@ const SignUp = () => {
     <div className="min-h-screen flex flex-col">
       <Navbar />
 
-      <div className="flex-1 flex items-center justify-center px-4 pt-24 pb-12">
-        <Card className="w-full max-w-md p-8 gradient-card shadow-2xl border-0">
-          <div className="text-center mb-8">
+      {/* --- THE FIX: Use h-full to fill remaining space --- */}
+      <div className="flex-1 h-full flex items-center justify-center px-4 py-8">
+        {/* --- THE FIX: Slightly reduce padding and add overflow handling --- */}
+        <Card className="w-full max-w-md p-6 gradient-card shadow-2xl border-0 max-h-[95vh] overflow-y-auto">
+          <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-accent shadow-glow mb-4">
               <Brain className="w-8 h-8 text-primary-foreground" />
             </div>
@@ -117,7 +117,6 @@ const SignUp = () => {
             </p>
           </div>
 
-          {/* --- NEW: Google Sign Up Button and Divider --- */}
           <div className="space-y-4">
             <Button
               variant="outline"
@@ -135,14 +134,14 @@ const SignUp = () => {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
+                <span className="bg-card px-2 text-muted-foreground">
                   Or continue with email
                 </span>
               </div>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name</Label>
               <Input
@@ -201,7 +200,7 @@ const SignUp = () => {
               </div>
 
               {formData.password && (
-                <div className="space-y-2">
+                <div className="space-y-2 pt-2">
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className={`h-full transition-all ${
