@@ -2,67 +2,57 @@ import { useState, useRef, useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Clock, TrendingUp, CloudSun, Sun, Search, Paperclip, ArrowUp, User, Bot, Plus } from "lucide-react";
+import {
+  Clock,
+  TrendingUp,
+  CloudSun,
+  Sun,
+  Paperclip,
+  ArrowUp,
+  User,
+  Bot,
+  Sparkles
+} from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 
-interface Message {
-  sender: "user" | "ai";
-  text: string;
-  model_used?: string;
-}
-
-interface MemoryEntry {
-  id: number;
-  prompt: string;
-  response: string;
-  timestamp: string;
-  model_used?: string;
-  session_id: number;
-}
-
-interface Session {
-  id: number;
-  title: string;
-  last_updated: string;
-}
+const CARD_W = 144;
+const GAP = 16;
+const CHAT_WIDTH = 4 * CARD_W + 3 * GAP;
 
 const widgets = [
   { icon: Clock, title: "Shimoga", value: "1:51 AM" },
   { icon: Sun, title: "Incognito Mode", description: "Your activity won’t be saved." },
   { icon: TrendingUp, title: "NVDA", value: "$187.62", change: "-0.97%", changeColor: "text-red-500" },
-  { icon: CloudSun, title: "Shimoga, India", value: "21°C", description: "Partly cloudy" },
+  { icon: CloudSun, title: "Shimoga, India", value: "21°C", description: "Partly cloudy" }
 ];
 
-async function fetchSessions(token: string): Promise<Session[]> {
+async function fetchSessions(token) {
   const res = await fetch("http://127.0.0.1:8000/api/v1/sessions/", {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) throw new Error("Failed to fetch sessions");
   return res.json();
 }
-
-async function fetchMemory(token: string, sessionId?: number): Promise<MemoryEntry[]> {
+async function fetchMemory(token, sessionId) {
   const url = sessionId
     ? `http://127.0.0.1:8000/api/v1/memory/?session_id=${sessionId}`
     : "http://127.0.0.1:8000/api/v1/memory/";
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) throw new Error("Couldn't load persistent memory");
   return res.json();
 }
 
 const Dashboard = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [sessions, setSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef(null);
 
-  // Load sessions on mount
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
@@ -73,50 +63,44 @@ const Dashboard = () => {
       setMessages([]);
     }
   }, []);
-
-  // Load chat history when sessionId changes
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token && currentSessionId !== null) {
       fetchMemory(token, currentSessionId)
-        .then((history) =>
+        .then(history =>
           setMessages(
-            history
-              .reverse()
-              .flatMap((mem) => [
-                { sender: "user", text: mem.prompt } as Message,
-                { sender: "ai", text: mem.response, model_used: mem.model_used },
-              ])
+            history.reverse().flatMap((mem) => [
+              { sender: "user", text: mem.prompt },
+              { sender: "ai", text: mem.response, model_used: mem.model_used },
+            ])
           )
         )
         .catch(() => setMessages([]));
     }
     if (currentSessionId === null) setMessages([]);
   }, [currentSessionId]);
-
-  // Auto-scroll chat
   useEffect(() => {
-    chatContainerRef.current?.scrollTo({
-      top: chatContainerRef.current.scrollHeight,
-      behavior: "smooth",
-    });
+    if (chatContainerRef.current && messages.length > 0) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth"
+      });
+    }
   }, [messages]);
-
   const handleSendMessage = async () => {
     if (!prompt.trim() || isLoading) return;
-
     const token = localStorage.getItem("token");
     if (!token) {
       toast.error("User not authenticated");
       return;
     }
-    const userMessage: Message = { sender: "user", text: prompt };
+    const userMessage = { sender: "user", text: prompt };
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
     setPrompt("");
-
     try {
-      const body = { prompt: userMessage.text };
+      const incognito = localStorage.getItem("incognitoMode") === "true";
+      const body = { prompt: userMessage.text, incognito };
       const response = await fetch("http://127.0.0.1:8000/api/v1/chat/route", {
         method: "POST",
         headers: {
@@ -125,164 +109,217 @@ const Dashboard = () => {
         },
         body: JSON.stringify(body),
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || "Something went wrong");
       }
-
       const data = await response.json();
-      const aiMessage: Message = {
+      const aiMessage = {
         sender: "ai",
         text: data.response,
         model_used: data.model_used,
       };
       setMessages((prev) => [...prev, aiMessage]);
-
-      // Refresh sessions
       const updatedSessions = await fetchSessions(token);
       setSessions(updatedSessions ?? []);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : "An unknown error occurred";
       toast.error(errorMessage);
       setMessages((prev) => prev.slice(0, prev.length - 1));
     } finally {
       setIsLoading(false);
     }
   };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
-
   const handleNewChat = () => {
     setCurrentSessionId(null);
     setMessages([]);
     setPrompt("");
   };
-
-  const handleSelectSession = (sessionId: number) => {
+  const handleSelectSession = (sessionId) => {
     setCurrentSessionId(sessionId);
   };
 
   return (
-    <div className="h-screen w-full flex bg-zinc-900 text-zinc-300 font-sans">
-      <Sidebar
-        isOpen={isSidebarOpen}
-        setIsOpen={setIsSidebarOpen}
-        sessions={sessions ?? []}
-        onNewChat={handleNewChat}
-        onSelectSession={handleSelectSession}
-      />
-
-      <main className="flex-1 flex flex-col items-center p-6">
-        <div className="w-full max-w-4xl mx-auto flex flex-col h-full">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 w-full">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-              <Input
-                placeholder="Ask anything..."
-                className="w-full h-14 bg-zinc-800 border-zinc-700 rounded-2xl pl-12 pr-28 text-base focus-visible:ring-1 focus-visible:ring-blue-500"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={isLoading}
-              />
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="hover:bg-zinc-700 text-zinc-400" disabled={isLoading}>
-                  <Paperclip className="w-5 h-5" />
+    <div className="h-screen w-full flex bg-zinc-900 text-zinc-300 font-sans overflow-hidden">
+      {/* Sidebar fixed */}
+      <div className="h-screen fixed top-0 left-0 z-20 bg-zinc-900">
+        <Sidebar
+          sessions={sessions ?? []}
+          onNewChat={handleNewChat}
+          onSelectSession={handleSelectSession}
+        />
+      </div>
+      {/* Main content scrollable */}
+      <main className="flex-1 flex flex-col items-center bg-zinc-900 relative h-screen ml-[80px] overflow-y-auto">
+        {messages.length === 0 && !isLoading ? (
+          <div className="w-full flex flex-col items-center justify-center h-full">
+            <form
+              className={`max-w-full flex flex-col items-center bg-zinc-900/80 rounded-2xl border border-zinc-800 focus-within:ring-2 focus-within:ring-blue-500 transition duration-150`}
+              style={{ width: `${CHAT_WIDTH}px` }}
+              tabIndex={-1}
+              onSubmit={e => {
+                e.preventDefault();
+                handleSendMessage();
+              }}
+            >
+              <div className="w-full flex flex-col gap-1 items-center p-6 pb-3">
+                <div className="w-full flex gap-1 items-center bg-zinc-900 rounded-2xl px-4 py-3 border-none shadow-none">
+                  <Input
+                    placeholder="Ask anything. Type @ for mentions and / for shortcuts."
+                    className="w-full bg-transparent border-none shadow-none outline-none text-base"
+                    value={prompt}
+                    onChange={e => setPrompt(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={isLoading}
+                    style={{ boxShadow: "none" }}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="flex items-center justify-center text-blue-400 border-0 shadow-none hover:bg-blue-900/40 h-9 w-9"
+                    tabIndex={0}
+                    aria-label="Enhance"
+                  >
+                    <Sparkles className="w-5 h-5" />
+                  </Button>
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={!prompt.trim() || isLoading}
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-9 w-9 flex items-center justify-center"
+                    type="submit"
+                  >
+                    <ArrowUp className="w-5 h-5" />
+                  </Button>
+                </div>
+                <div className="mt-2 flex gap-1 w-full">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="hover:bg-zinc-800 text-zinc-400"
+                    disabled={isLoading}
+                    type="button"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </form>
+            <div
+              className="mt-4 grid grid-cols-4 gap-4"
+              style={{ width: `${CHAT_WIDTH}px`, maxWidth: "100%" }}
+            >
+              {widgets.map((widget, idx) => (
+                <Card
+                  key={idx}
+                  className="bg-zinc-800 border-zinc-700 rounded-2xl flex flex-col items-center justify-center shadow hover:shadow-lg transition-all"
+                  style={{
+                    width: `${CARD_W}px`,
+                    height: `${CARD_W}px`,
+                  }}
+                >
+                  <CardContent className="flex flex-col items-center justify-between h-full w-full p-0 pt-5 pb-5">
+                    <widget.icon className="w-6 h-6 text-zinc-400 mb-2" />
+                    <span className="text-sm text-zinc-400">{widget.title}</span>
+                    {widget.value && (
+                      <span className="text-xl mt-2 mb-1 font-semibold text-zinc-100">{widget.value}</span>
+                    )}
+                    {widget.description && (
+                      <span className="text-xs mt-1 mb-1 text-zinc-400">{widget.description}</span>
+                    )}
+                    {widget.change && (
+                      <span className={`text-xs font-semibold mt-1 ${widget.changeColor}`}>{widget.change}</span>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="w-full flex flex-col items-center pt-10" style={{ minHeight: "63vh" }}>
+              <div className="w-full max-w-2xl px-6" ref={chatContainerRef}>
+                <div className="space-y-12 w-full">
+                  {messages.map((msg, i) => (
+                    <div key={i} className="flex flex-col items-start w-full">
+                      {msg.sender === "user" && (
+                        <div className="flex items-center gap-2 font-bold text-lg text-zinc-200 w-full mb-2">
+                          <span className="">{msg.text}</span>
+                          <User className="w-5 h-5 text-blue-400" />
+                        </div>
+                      )}
+                      {msg.sender === "ai" && (
+                        <div className="w-full flex flex-col items-start px-2">
+                          <span className="font-medium text-sm text-blue-400 flex items-center gap-2 mb-1">
+                            <Bot className="w-4 h-4" />
+                            Assistant
+                          </span>
+                          <div className="w-full border-t border-zinc-700 mb-2"></div>
+                          <div className="text-zinc-200 pb-2">{msg.text}</div>
+                          {msg.model_used && (
+                            <span className="text-xs text-zinc-400">
+                              Answered by: {msg.model_used}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex flex-row items-center gap-2 self-center mt-6">
+                      <Bot size={24} className="text-blue-400 animate-pulse" />
+                      <span className="text-zinc-400">Thinking...</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="fixed left-0 right-0 bottom-0 flex justify-center pointer-events-none z-50 bg-zinc-900">
+              <form
+                className="w-full max-w-2xl mb-6 flex gap-2 items-center pointer-events-auto"
+                onSubmit={e => {
+                  e.preventDefault();
+                  handleSendMessage();
+                }}
+              >
+                <Input
+                  placeholder="Ask anything..."
+                  className="w-full h-12 bg-zinc-800 border-zinc-700 rounded-2xl pl-4 pr-24 text-base focus-visible:ring-1 focus-visible:ring-blue-500"
+                  value={prompt}
+                  onChange={e => setPrompt(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={isLoading}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hover:bg-zinc-700 text-zinc-400"
+                  disabled={isLoading}
+                  type="button"
+                >
+                  <Paperclip className="w-4 h-4" />
                 </Button>
                 <Button
                   onClick={handleSendMessage}
                   disabled={!prompt.trim() || isLoading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-9 w-9 p-0"
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-10 w-10 flex items-center justify-center"
+                  type="submit"
                 >
                   <ArrowUp className="w-5 h-5" />
                 </Button>
-              </div>
+              </form>
             </div>
-            <Button
-              variant="outline"
-              className="ml-2 px-5 py-2 border-blue-500 text-blue-500 flex items-center gap-2"
-              onClick={handleNewChat}
-              title="Start a new chat"
-            >
-              <Plus size={18} /> New Chat
-            </Button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto" ref={chatContainerRef}>
-            {messages.length === 0 && !isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {widgets.map((widget, index) => (
-                  <Card key={index} className="bg-zinc-800 border-zinc-700 rounded-2xl p-4 flex flex-col justify-between">
-                    <CardContent className="p-0">
-                      <div className="flex justify-between items-start mb-4">
-                        <widget.icon className="w-5 h-5 text-zinc-400" />
-                        {widget.change && <span className={`text-sm font-semibold ${widget.changeColor}`}>{widget.change}</span>}
-                      </div>
-                      <div>
-                        <p className="text-sm text-zinc-400">{widget.title}</p>
-                        {widget.value && <p className="text-2xl font-semibold text-zinc-100">{widget.value}</p>}
-                        {widget.description && <p className="text-xs text-zinc-500 mt-1">{widget.description}</p>}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-6 pr-4">
-                {messages.map((message, index) => (
-                  <div key={index} className={`flex items-start gap-4 ${message.sender === "user" ? "justify-end" : "justify-start"}`}>
-                    {message.sender === "ai" && (
-                      <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-                        <Bot size={20} />
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-xl p-4 rounded-2xl ${
-                        message.sender === "user"
-                          ? "bg-blue-600 text-white rounded-br-none"
-                          : "bg-zinc-800 text-zinc-300 rounded-bl-none"
-                      }`}
-                    >
-                      <p className="whitespace-pre-wrap">{message.text}</p>
-                      {message.sender === "ai" && message.model_used && (
-                        <p className="text-xs text-zinc-500 mt-2 opacity-70">Answered by: {message.model_used}</p>
-                      )}
-                    </div>
-                    {message.sender === "user" && (
-                      <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center flex-shrink-0">
-                        <User size={20} />
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="flex items-start gap-4 justify-start">
-                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0 animate-pulse">
-                      <Bot size={20} />
-                    </div>
-                    <div className="max-w-xl p-4 rounded-2xl bg-zinc-800 text-zinc-300 rounded-bl-none">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce delay-75"></div>
-                        <div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce delay-150"></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+          </>
+        )}
       </main>
     </div>
   );
 };
 
 export default Dashboard;
-
