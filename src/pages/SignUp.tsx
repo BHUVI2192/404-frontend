@@ -1,23 +1,24 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Brain, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import Navbar from "@/components/Navbar";
 import { registerUser } from "@/lib/api";
 
-const GoogleIcon = () => (
-  <svg className="w-5 h-5 mr-2" viewBox="0 0 48 48">
-    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039L38.802 9.92C34.553 6.08 29.658 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"></path>
-    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039L38.802 9.92C34.553 6.08 29.658 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"></path>
-    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.225 0-9.652-3.512-11.303-8H6.306C9.656 35.663 16.318 40 24 40z"></path>
-    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303A12.04 12.04 0 0 1 31.697 34.81l6.19-5.238C41.333 26.6 44 23.4 44 20c0-1.341-.138-2.65-.389-3.917z"></path>
+// Simple Google icon (SVG)
+const GoogleIcon = (
+  <svg viewBox="0 0 32 32" className="w-5 h-5 mr-2" aria-hidden="true">
+    <g>
+      <path fill="#4285F4" d="M31.96 16.251c0-1.153-.1-2.007-.314-2.751H16.253v5.016h8.651c-.177 1.356-1.13 3.384-3.25 4.757l-.03.2 4.727 3.667.328.033c3.01-2.774 4.749-6.853 4.749-10.922"/>
+      <path fill="#34A853" d="M16.253 31c4.054 0 7.448-1.34 9.927-3.646l-4.735-3.67c-1.273.889-2.993 1.507-5.192 1.507-3.991 0-7.373-2.689-8.583-6.408l-.179.018-4.635 3.618-.062.168C3.85 28.143 9.683 31 16.253 31"/>
+      <path fill="#FBBC05" d="M7.67 19.785a8.887 8.887 0 0 1-.491-2.828c0-.983.178-1.935.481-2.828l-.008-.189L3.018 10.271l-.154.073A14.756 14.756 0 0 0 1.253 16c0 2.407.581 4.695 1.611 6.812l6.028-3.027"/>
+      <path fill="#EA4335" d="M16.253 7.35c2.438 0 4.081 1.055 5.021 1.937l3.663-3.581C23.692 3.744 20.307 2 16.253 2 9.683 2 3.85 4.857 1.253 9.188l6.029 3.027c1.211-3.719 4.592-6.408 8.971-6.408"/>
+    </g>
   </svg>
 );
-
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ const SignUp = () => {
     confirmPassword: "",
   });
 
-  const getPasswordStrength = (password: string) => {
+  const getPasswordStrength = (password) => {
     if (password.length === 0) return { strength: 0, label: "" };
     if (password.length < 6) return { strength: 25, label: "Weak" };
     if (password.length < 10) return { strength: 50, label: "Fair" };
@@ -40,40 +41,35 @@ const SignUp = () => {
       return { strength: 65, label: "Good" };
     return { strength: 100, label: "Strong" };
   };
-
   const passwordStrength = getPasswordStrength(formData.password);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-
     if (!formData.fullName || !formData.email || !formData.password) {
       toast.error("Please fill in all fields");
       setIsLoading(false);
       return;
     }
-
     if (formData.password !== formData.confirmPassword) {
       toast.error("Passwords do not match");
       setIsLoading(false);
       return;
     }
-
     if (formData.password.length < 8) {
       toast.error("Password must be at least 8 characters");
       setIsLoading(false);
       return;
     }
-
     try {
       const data = await registerUser(formData.email, formData.password);
       localStorage.setItem("token", data.access_token);
       toast.success("Account created successfully!");
       navigate("/dashboard");
-    } catch (error: unknown) {
+    } catch (error) {
       toast.error(
         typeof error === "object" && error !== null && "message" in error
-          ? (error as { message: string }).message
+          ? error.message
           : String(error)
       );
     } finally {
@@ -81,69 +77,57 @@ const SignUp = () => {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  // Google OAuth handler
+  const handleGoogleSignup = async () => {
     setIsGoogleLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:8000/auth/google/login');
-      if (!response.ok) {
-        throw new Error("Could not get Google login URL from server.");
-      }
+      const response = await fetch("http://127.0.0.1:8000/auth/google/login");
+      if (!response.ok) throw new Error("Unable to redirect to Google.");
       const data = await response.json();
-      window.location.href = data.authorization_url;
-    } catch (error: unknown) {
-      const errorMessage = typeof error === "object" && error !== null && "message" in error
-        ? (error as { message: string }).message
-        : "An error occurred during Google login";
-      toast.error(errorMessage);
+      window.location.href = data.authorizationurl;
+    } catch (error) {
+      toast.error("Failed to start Google signup.");
       setIsGoogleLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-
-      {/* --- THE FIX: Use h-full to fill remaining space --- */}
-      <div className="flex-1 h-full flex items-center justify-center px-4 py-8">
-        {/* --- THE FIX: Slightly reduce padding and add overflow handling --- */}
-        <Card className="w-full max-w-md p-6 gradient-card shadow-2xl border-0 max-h-[95vh] overflow-y-auto">
-          <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-accent shadow-glow mb-4">
-              <Brain className="w-8 h-8 text-primary-foreground" />
-            </div>
-            <h1 className="text-3xl font-bold mb-2">Create Your Account</h1>
-            <p className="text-muted-foreground">
-              Start building with 404 today
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#111]">
+      {/* Extreme left top 404 AI button */}
+      <div className="fixed top-0 left-0 w-full flex px-6 py-5 items-center z-40">
+        <button
+          type="button"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black/10 hover:bg-emerald-950/40 transition border border-emerald-500/10 shadow text-emerald-300 font-bold text-lg"
+          onClick={() => navigate("/")}
+        >
+          404 AI
+        </button>
+      </div>
+      <div className="flex-1 flex items-center justify-center w-full">
+        <Card
+          className="
+            w-full max-w-[360px] min-h-[510px] bg-[rgba(14,22,18,0.98)]
+            border-none rounded-2xl px-7 py-8
+            shadow-[0_6px_32px_0_#00ffc244,0_0px_1px_#009e5b]
+            flex flex-col justify-center
+          "
+        >
+          <div className="text-center mb-7">
+            <h2 className="text-2xl font-bold tracking-tight text-emerald-300 mb-1">
+              404 Society
+            </h2>
+            <h1 className="text-xl font-semibold text-white mb-1">
+              Join The Society
+            </h1>
+            <p className="text-gray-400 text-sm mt-1">
+              Create an account to get started
             </p>
           </div>
-
-          <div className="space-y-4">
-            <Button
-              variant="outline"
-              type="button"
-              className="w-full h-12 text-base"
-              onClick={handleGoogleLogin}
-              disabled={isGoogleLoading || isLoading}
-            >
-              <GoogleIcon />
-              {isGoogleLoading ? "Redirecting..." : "Sign up with Google"}
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
-                  Or continue with email
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="fullName" className="text-white font-medium mb-1 block">
+                Full Name
+              </Label>
               <Input
                 id="fullName"
                 type="text"
@@ -152,28 +136,30 @@ const SignUp = () => {
                 onChange={(e) =>
                   setFormData({ ...formData, fullName: e.target.value })
                 }
-                className="h-12"
+                className="h-10 rounded-md border border-emerald-400/25 bg-[#181d19] text-white px-4 focus:border-emerald-400"
                 disabled={isLoading || isGoogleLoading}
               />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+            <div>
+              <Label htmlFor="email" className="text-white font-medium mb-1 block">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="john@example.com"
+                placeholder="you@example.com"
                 value={formData.email}
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="h-12"
+                className="h-10 rounded-md border border-emerald-400/25 bg-[#181d19] text-white px-4 focus:border-emerald-400"
                 disabled={isLoading || isGoogleLoading}
               />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+            <div>
+              <Label htmlFor="password" className="text-white font-medium mb-1 block">
+                Password
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -183,25 +169,22 @@ const SignUp = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, password: e.target.value })
                   }
-                  className="h-12 pr-12"
+                  className="h-10 rounded-md border border-emerald-400/25 bg-[#181d19] text-white px-4 pr-11 focus:border-emerald-400"
                   disabled={isLoading || isGoogleLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400 hover:text-emerald-600"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-
               {formData.password && (
-                <div className="space-y-2 pt-2">
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div className="space-y-1 pt-2">
+                  <div className="h-2 rounded-full bg-[#182617] overflow-hidden">
                     <div
                       className={`h-full transition-all ${
                         passwordStrength.strength === 100
@@ -215,15 +198,16 @@ const SignUp = () => {
                       style={{ width: `${passwordStrength.strength}%` }}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-gray-400">
                     Strength: {passwordStrength.label}
                   </p>
                 </div>
               )}
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <div>
+              <Label htmlFor="confirmPassword" className="text-white font-medium mb-1 block">
+                Confirm Password
+              </Label>
               <div className="relative">
                 <Input
                   id="confirmPassword"
@@ -233,36 +217,45 @@ const SignUp = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, confirmPassword: e.target.value })
                   }
-                  className="h-12 pr-12"
+                  className="h-10 rounded-md border border-emerald-400/25 bg-[#181d19] text-white px-4 pr-11 focus:border-emerald-400"
                   disabled={isLoading || isGoogleLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400 hover:text-emerald-600"
+                  tabIndex={-1}
+                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                 >
-                  {showConfirmPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
-
             <Button
               type="submit"
-              className="w-full h-12 text-lg gradient-accent shadow-glow"
+              className="w-full h-11 rounded-md bg-gradient-to-r from-emerald-400 to-green-400 text-black font-semibold shadow hover:from-emerald-300 hover:to-green-500 transition mt-3"
               disabled={isLoading || isGoogleLoading}
+              aria-busy={isLoading}
             >
-              {isLoading ? "Creating Account..." : "Sign Up"}
+              {isLoading ? "Creating Account..." : "Create Account"}
             </Button>
           </form>
-
-          <div className="mt-6 text-center text-sm">
-            <span className="text-muted-foreground">Already have an account? </span>
-            <Link to="/login" className="text-accent font-medium hover:underline">
-              Log In
+          {/* Google Sign Up Button below */}
+          <Button
+            variant="outline"
+            type="button"
+            className="w-full h-11 rounded-md !bg-white text-black font-semibold shadow flex items-center justify-center hover:shadow-lg hover:brightness-95 transition mt-4"
+            onClick={handleGoogleSignup}
+            disabled={isGoogleLoading || isLoading}
+            aria-busy={isGoogleLoading}
+          >
+            {GoogleIcon}
+            {isGoogleLoading ? "Redirecting..." : "Sign Up with Google"}
+          </Button>
+          <div className="mt-7 text-center text-sm">
+            <span className="text-gray-400">Already have an account? </span>
+            <Link to="/login" className="text-emerald-300 font-bold hover:underline ml-1">
+              Sign In
             </Link>
           </div>
         </Card>

@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import "tailwindcss/tailwind.css";
 
 const CARD_W = 144;
 const GAP = 16;
@@ -147,7 +149,12 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="h-screen w-full flex bg-zinc-900 text-zinc-300 font-sans overflow-hidden">
+    <div className="h-screen w-full flex bg-zinc-900 text-zinc-300 font-sans overflow-hidden relative">
+      {/* Subtle top light/rays effect */}
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-40 z-10"
+           style={{
+             background: "radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.11) 0%, rgba(34,197,94,0.03) 70%, transparent 100%)"
+           }}/>
       {/* Sidebar fixed */}
       <div className="h-screen fixed top-0 left-0 z-20 bg-zinc-900">
         <Sidebar
@@ -161,8 +168,17 @@ const Dashboard = () => {
         {messages.length === 0 && !isLoading ? (
           <div className="w-full flex flex-col items-center justify-center h-full">
             <form
-              className={`max-w-full flex flex-col items-center bg-zinc-900/80 rounded-2xl border border-zinc-800 focus-within:ring-2 focus-within:ring-blue-500 transition duration-150`}
-              style={{ width: `${CHAT_WIDTH}px` }}
+              className={`
+                max-w-full flex flex-col items-center bg-zinc-900/80 rounded-2xl
+                border border-emerald-400/80
+                shadow-[0_0_28px_4px_rgba(16,185,129,0.15)]
+                focus-within:border-emerald-200
+                transition duration-150
+                `}
+              style={{
+                width: `${CHAT_WIDTH}px`,
+                boxShadow: "0 0 34px 0 rgba(16,185,129,0.19), 0 0 4px 0 rgba(16,185,129,0.21)"
+              }}
               tabIndex={-1}
               onSubmit={e => {
                 e.preventDefault();
@@ -183,7 +199,7 @@ const Dashboard = () => {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="flex items-center justify-center text-blue-400 border-0 shadow-none hover:bg-blue-900/40 h-9 w-9"
+                    className="flex items-center justify-center text-emerald-400 border-0 shadow-none hover:bg-emerald-950/30 h-9 w-9"
                     tabIndex={0}
                     aria-label="Enhance"
                   >
@@ -192,7 +208,7 @@ const Dashboard = () => {
                   <Button
                     onClick={handleSendMessage}
                     disabled={!prompt.trim() || isLoading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-9 w-9 flex items-center justify-center"
+                    className="bg-emerald-500/80 hover:bg-emerald-400 text-black rounded-xl h-9 w-9 flex items-center justify-center"
                     type="submit"
                   >
                     <ArrowUp className="w-5 h-5" />
@@ -211,6 +227,7 @@ const Dashboard = () => {
                 </div>
               </div>
             </form>
+            {/* Widgets as in your original, no glow */}
             <div
               className="mt-4 grid grid-cols-4 gap-4"
               style={{ width: `${CHAT_WIDTH}px`, maxWidth: "100%" }}
@@ -243,6 +260,7 @@ const Dashboard = () => {
           </div>
         ) : (
           <>
+            {/* --- Chat/Message history rendering --- */}
             <div className="w-full flex flex-col items-center pt-10" style={{ minHeight: "63vh" }}>
               <div className="w-full max-w-2xl px-6" ref={chatContainerRef}>
                 <div className="space-y-12 w-full">
@@ -251,17 +269,19 @@ const Dashboard = () => {
                       {msg.sender === "user" && (
                         <div className="flex items-center gap-2 font-bold text-lg text-zinc-200 w-full mb-2">
                           <span className="">{msg.text}</span>
-                          <User className="w-5 h-5 text-blue-400" />
+                          <User className="w-5 h-5 text-emerald-400" />
                         </div>
                       )}
                       {msg.sender === "ai" && (
                         <div className="w-full flex flex-col items-start px-2">
-                          <span className="font-medium text-sm text-blue-400 flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm text-emerald-300 flex items-center gap-2 mb-1">
                             <Bot className="w-4 h-4" />
                             Assistant
                           </span>
                           <div className="w-full border-t border-zinc-700 mb-2"></div>
-                          <div className="text-zinc-200 pb-2">{msg.text}</div>
+                          <div className="text-zinc-200 pb-2 prose prose-zinc dark:prose-invert max-w-none">
+                            <ReactMarkdown>{msg.text}</ReactMarkdown>
+                          </div>
                           {msg.model_used && (
                             <span className="text-xs text-zinc-400">
                               Answered by: {msg.model_used}
@@ -273,8 +293,8 @@ const Dashboard = () => {
                   ))}
                   {isLoading && (
                     <div className="flex flex-row items-center gap-2 self-center mt-6">
-                      <Bot size={24} className="text-blue-400 animate-pulse" />
-                      <span className="text-zinc-400">Thinking...</span>
+                      <Bot size={24} className="text-emerald-400 animate-pulse" />
+                      <span className="text-emerald-300">Thinking...</span>
                     </div>
                   )}
                 </div>
@@ -282,7 +302,14 @@ const Dashboard = () => {
             </div>
             <div className="fixed left-0 right-0 bottom-0 flex justify-center pointer-events-none z-50 bg-zinc-900">
               <form
-                className="w-full max-w-2xl mb-6 flex gap-2 items-center pointer-events-auto"
+                className={`
+                  w-full max-w-2xl mb-6 flex gap-2 items-center pointer-events-auto
+                  border-2 border-emerald-400/80 rounded-2xl
+                  shadow-[0_0_34px_0_rgba(16,185,129,0.17)]
+                  `}
+                style={{
+                  boxShadow: "0 0 34px 0 rgba(16,185,129,0.17), 0 0 8px 0 rgba(16,185,129,0.13)"
+                }}
                 onSubmit={e => {
                   e.preventDefault();
                   handleSendMessage();
@@ -290,7 +317,7 @@ const Dashboard = () => {
               >
                 <Input
                   placeholder="Ask anything..."
-                  className="w-full h-12 bg-zinc-800 border-zinc-700 rounded-2xl pl-4 pr-24 text-base focus-visible:ring-1 focus-visible:ring-blue-500"
+                  className="w-full h-12 bg-zinc-800 border-none rounded-2xl pl-4 pr-24 text-base"
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -299,7 +326,7 @@ const Dashboard = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="hover:bg-zinc-700 text-zinc-400"
+                  className="hover:bg-zinc-800 text-zinc-400"
                   disabled={isLoading}
                   type="button"
                 >
@@ -308,7 +335,7 @@ const Dashboard = () => {
                 <Button
                   onClick={handleSendMessage}
                   disabled={!prompt.trim() || isLoading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-10 w-10 flex items-center justify-center"
+                  className="bg-emerald-500/80 hover:bg-emerald-400 text-black rounded-lg h-10 w-10 flex items-center justify-center"
                   type="submit"
                 >
                   <ArrowUp className="w-5 h-5" />
