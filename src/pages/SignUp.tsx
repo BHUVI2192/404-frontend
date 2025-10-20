@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { registerUser } from "@/lib/api";
 
-// Simple Google icon (SVG)
+// Google icon SVG
 const GoogleIcon = (
   <svg viewBox="0 0 32 32" className="w-5 h-5 mr-2" aria-hidden="true">
     <g>
@@ -19,6 +19,8 @@ const GoogleIcon = (
     </g>
   </svg>
 );
+
+const GOOGLE_AUTH_URL = "http://127.0.0.1:8000/auth/google/login"; // Production: use https://yourdomain.com/api/auth/google/login
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -81,10 +83,13 @@ const SignUp = () => {
   const handleGoogleSignup = async () => {
     setIsGoogleLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8000/auth/google/login");
+      const response = await fetch(GOOGLE_AUTH_URL);
       if (!response.ok) throw new Error("Unable to redirect to Google.");
       const data = await response.json();
-      window.location.href = data.authorizationurl;
+      window.location.href = 
+        data.authorization_url ||
+        data.authorizationurl ||
+        data.url;
     } catch (error) {
       toast.error("Failed to start Google signup.");
       setIsGoogleLoading(false);
@@ -93,7 +98,7 @@ const SignUp = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#111]">
-      {/* Extreme left top 404 AI button */}
+      {/* Top left 404 AI button */}
       <div className="fixed top-0 left-0 w-full flex px-6 py-5 items-center z-40">
         <button
           type="button"

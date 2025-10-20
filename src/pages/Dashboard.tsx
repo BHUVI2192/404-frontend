@@ -15,12 +15,28 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
 import "tailwindcss/tailwind.css";
+
+// Utility: Always display answers as bullet points, even from paragraph content
+function splitToBullets(text) {
+  if (!text) return [];
+  const bullets = text
+    .split(/\n{2,}|\r{2,}/)
+    .flatMap(par =>
+      par.match(/^(\*|-|\d+\.) /m) ? par.split(/\n/).filter(Boolean) : [par]
+    )
+    .map(line => line.replace(/^(\* |- |\d+\.\s*)/, "").trim())
+    .filter(Boolean)
+    .flatMap(line =>
+      line.split(/(?<=\.)\s+(?=[A-Z])/g)
+    ).filter(Boolean);
+  return bullets;
+}
 
 const CARD_W = 144;
 const GAP = 16;
 const CHAT_WIDTH = 4 * CARD_W + 3 * GAP;
+const MAX_MINIMAL_BULLETS = 3;
 
 const widgets = [
   { icon: Clock, title: "Shimoga", value: "1:51 AM" },
@@ -51,10 +67,19 @@ const Dashboard = () => {
   const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [expanded, setExpanded] = useState({});
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const chatContainerRef = useRef(null);
 
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages, isLoading]);
+
+  // Fetch sessions on mount
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
@@ -65,6 +90,7 @@ const Dashboard = () => {
       setMessages([]);
     }
   }, []);
+  // Fetch messages when session changes
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token && currentSessionId !== null) {
@@ -78,17 +104,12 @@ const Dashboard = () => {
           )
         )
         .catch(() => setMessages([]));
+      setExpanded({});
     }
     if (currentSessionId === null) setMessages([]);
   }, [currentSessionId]);
-  useEffect(() => {
-    if (chatContainerRef.current && messages.length > 0) {
-      chatContainerRef.current.scrollTo({
-        top: chatContainerRef.current.scrollHeight,
-        behavior: "smooth"
-      });
-    }
-  }, [messages]);
+
+  // --- Key logic: Always send session_id and always update from backend after send! ---
   const handleSendMessage = async () => {
     if (!prompt.trim() || isLoading) return;
     const token = localStorage.getItem("token");
@@ -102,7 +123,13 @@ const Dashboard = () => {
     setPrompt("");
     try {
       const incognito = localStorage.getItem("incognitoMode") === "true";
-      const body = { prompt: userMessage.text, incognito };
+      // Always include session_id if it exists
+      const body: { prompt: string; incognito: boolean; session_id?: string } = {
+        prompt: userMessage.text,
+        incognito,
+      };
+      if (currentSessionId) body.session_id = currentSessionId;
+
       const response = await fetch("http://127.0.0.1:8000/api/v1/chat/route", {
         method: "POST",
         headers: {
@@ -122,8 +149,11 @@ const Dashboard = () => {
         model_used: data.model_used,
       };
       setMessages((prev) => [...prev, aiMessage]);
-      const updatedSessions = await fetchSessions(token);
-      setSessions(updatedSessions ?? []);
+      // Always update the currentSessionId with the backend value!
+      if (data.session_id && data.session_id !== currentSessionId) {
+        setCurrentSessionId(data.session_id);
+        // Sessions/data will auto-refresh on id change due to useEffect
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "An unknown error occurred";
@@ -133,29 +163,32 @@ const Dashboard = () => {
       setIsLoading(false);
     }
   };
+
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
+
   const handleNewChat = () => {
     setCurrentSessionId(null);
     setMessages([]);
     setPrompt("");
+    setExpanded({});
   };
+
   const handleSelectSession = (sessionId) => {
     setCurrentSessionId(sessionId);
+    setExpanded({});
   };
 
   return (
     <div className="h-screen w-full flex bg-zinc-900 text-zinc-300 font-sans overflow-hidden relative">
-      {/* Subtle top light/rays effect */}
       <div className="pointer-events-none fixed inset-x-0 top-0 h-40 z-10"
-           style={{
-             background: "radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.11) 0%, rgba(34,197,94,0.03) 70%, transparent 100%)"
-           }}/>
-      {/* Sidebar fixed */}
+        style={{
+          background: "radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.11) 0%, rgba(34,197,94,0.03) 70%, transparent 100%)"
+        }}/>
       <div className="h-screen fixed top-0 left-0 z-20 bg-zinc-900">
         <Sidebar
           sessions={sessions ?? []}
@@ -163,7 +196,6 @@ const Dashboard = () => {
           onSelectSession={handleSelectSession}
         />
       </div>
-      {/* Main content scrollable */}
       <main className="flex-1 flex flex-col items-center bg-zinc-900 relative h-screen ml-[80px] overflow-y-auto">
         {messages.length === 0 && !isLoading ? (
           <div className="w-full flex flex-col items-center justify-center h-full">
@@ -174,10 +206,10 @@ const Dashboard = () => {
                 shadow-[0_0_28px_4px_rgba(16,185,129,0.15)]
                 focus-within:border-emerald-200
                 transition duration-150
-                `}
+              `}
               style={{
                 width: `${CHAT_WIDTH}px`,
-                boxShadow: "0 0 34px 0 rgba(16,185,129,0.19), 0 0 4px 0 rgba(16,185,129,0.21)"
+                marginBottom: "28px"
               }}
               tabIndex={-1}
               onSubmit={e => {
@@ -227,7 +259,6 @@ const Dashboard = () => {
                 </div>
               </div>
             </form>
-            {/* Widgets as in your original, no glow */}
             <div
               className="mt-4 grid grid-cols-4 gap-4"
               style={{ width: `${CHAT_WIDTH}px`, maxWidth: "100%" }}
@@ -260,53 +291,73 @@ const Dashboard = () => {
           </div>
         ) : (
           <>
-            {/* --- Chat/Message history rendering --- */}
-            <div className="w-full flex flex-col items-center pt-10" style={{ minHeight: "63vh" }}>
-              <div className="w-full max-w-2xl px-6" ref={chatContainerRef}>
-                <div className="space-y-12 w-full">
-                  {messages.map((msg, i) => (
-                    <div key={i} className="flex flex-col items-start w-full">
-                      {msg.sender === "user" && (
-                        <div className="flex items-center gap-2 font-bold text-lg text-zinc-200 w-full mb-2">
-                          <span className="">{msg.text}</span>
+            <div className="w-full flex flex-col items-center pt-10 pb-2" style={{ minHeight: "63vh" }}>
+              <div
+                className="flex flex-col w-full max-w-2xl px-6 space-y-12 pb-6 overflow-y-auto"
+                style={{
+                  maxHeight: "calc(100vh - 230px)"
+                }}
+              >
+                {messages.map((msg, i) => {
+                  const isAI = msg.sender === "ai";
+                  if (!isAI) {
+                    return (
+                      <div key={i} className="flex flex-col gap-2 items-start w-full">
+                        <div className="flex items-center gap-2 font-bold text-lg text-zinc-200 w-full mb-1">
+                          <span>{msg.text}</span>
                           <User className="w-5 h-5 text-emerald-400" />
                         </div>
-                      )}
-                      {msg.sender === "ai" && (
-                        <div className="w-full flex flex-col items-start px-2">
-                          <span className="font-medium text-sm text-emerald-300 flex items-center gap-2 mb-1">
-                            <Bot className="w-4 h-4" />
-                            Assistant
-                          </span>
-                          <div className="w-full border-t border-zinc-700 mb-2"></div>
-                          <div className="text-zinc-200 pb-2 prose prose-zinc dark:prose-invert max-w-none">
-                            <ReactMarkdown>{msg.text}</ReactMarkdown>
-                          </div>
-                          {msg.model_used && (
-                            <span className="text-xs text-zinc-400">
-                              Answered by: {msg.model_used}
-                            </span>
-                          )}
-                        </div>
+                      </div>
+                    );
+                  }
+                  const bullets = splitToBullets(msg.text);
+                  const isLong = bullets.length > MAX_MINIMAL_BULLETS;
+                  const showAll = !!expanded[i] || !isLong;
+                  return (
+                    <div key={i} className="flex flex-col gap-2 items-start w-full">
+                      <span className="font-medium text-sm text-emerald-300 flex items-center gap-2 mb-1">
+                        <Bot className="w-4 h-4" />
+                        Assistant
+                      </span>
+                      <div className="w-full border-t border-zinc-700 mb-2"></div>
+                      <ul className="w-full text-zinc-100 text-base leading-relaxed pl-6 space-y-3 list-disc">
+                        {(showAll ? bullets : bullets.slice(0, MAX_MINIMAL_BULLETS)).map((b, idx) => (
+                          <li key={idx}>{b}</li>
+                        ))}
+                      </ul>
+                      {isLong && !showAll &&
+                        <button
+                          onClick={() => setExpanded(prev => ({ ...prev, [i]: true }))}
+                          className="mt-2 text-emerald-300 hover:underline text-sm px-2"
+                        >
+                          Show More
+                        </button>
+                      }
+                      {msg.model_used && (
+                        <span className="text-xs text-zinc-400 mt-1">
+                          Answered by: {msg.model_used}
+                        </span>
                       )}
                     </div>
-                  ))}
-                  {isLoading && (
-                    <div className="flex flex-row items-center gap-2 self-center mt-6">
-                      <Bot size={24} className="text-emerald-400 animate-pulse" />
-                      <span className="text-emerald-300">Thinking...</span>
-                    </div>
-                  )}
-                </div>
+                  );
+                })}
+                {isLoading && (
+                  <div className="flex flex-row items-center gap-2 self-center mt-6">
+                    <Bot size={24} className="text-emerald-400 animate-pulse" />
+                    <span className="text-emerald-300">Thinking...</span>
+                  </div>
+                )}
+                <div ref={chatEndRef}></div>
               </div>
             </div>
             <div className="fixed left-0 right-0 bottom-0 flex justify-center pointer-events-none z-50 bg-zinc-900">
               <form
                 className={`
-                  w-full max-w-2xl mb-6 flex gap-2 items-center pointer-events-auto
+                  w-full max-w-2xl my-8 flex gap-2 items-center pointer-events-auto
                   border-2 border-emerald-400/80 rounded-2xl
                   shadow-[0_0_34px_0_rgba(16,185,129,0.17)]
-                  `}
+                  bg-zinc-900
+                `}
                 style={{
                   boxShadow: "0 0 34px 0 rgba(16,185,129,0.17), 0 0 8px 0 rgba(16,185,129,0.13)"
                 }}

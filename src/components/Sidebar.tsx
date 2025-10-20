@@ -79,7 +79,6 @@ const Sidebar = ({
           <BookOpen className="w-5 h-5" />
           {open && <span>History</span>}
         </Button>
-        {/* Extremely clear, padded, readable history flyout */}
         {showHistory && open && (
           <div
             className="relative ml-8 mb-2 flex flex-col gap-3 max-h-72 min-h-[72px] overflow-y-auto border-l border-zinc-800 bg-zinc-800 pl-4 pr-3 py-4 rounded-xl shadow-inner custom-scrollbar"
@@ -107,7 +106,6 @@ const Sidebar = ({
                 </button>
               ))
             )}
-            {/* Sticky scroll-to-bottom button */}
             <div className="sticky bottom-2 right-2 flex justify-end">
               <button
                 type="button"
@@ -182,6 +180,12 @@ const Sidebar = ({
           background: transparent;
         }
       `}</style>
+      {/* 
+        To fully enable correct thread grouping:
+        - When user clicks 'New Chat', parent must clear the selected sessionId and start a new conversation.
+        - When user selects a session, parent should load that session's messages and pass sessionId on each chat API call.
+        - When the chat API returns session_id, parent should update its selected sessionId state for subsequent messages.
+      */}
     </nav>
   );
 };
